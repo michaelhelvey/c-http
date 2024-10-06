@@ -1,14 +1,10 @@
-OBJECTS = common
+OBJECTS = kqueue
 
-# Directories
 SRC_DIR = src
 BUILD_DIR = build
-
-# Compiler and flags
 CC = clang
-CFLAGS = -Wall -Werror -Wextra -std=c11 -g
+CFLAGS = -Wall -Werror -Wextra -std=c17 -g
 
-# Entry points
 MAIN = main
 TEST_MAIN = test_main
 

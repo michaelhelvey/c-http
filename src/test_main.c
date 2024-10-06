@@ -1,9 +1,18 @@
-#include <stdio.h>
+#include "common.h"
+#include "kqueue.h"
 
-extern void common_foo();
+int main()
+{
+    int r = 0;
 
-int main() {
-  common_foo();
-  printf("(test): Hello, World!\n");
-  return 0;
+    // kqueue.c
+    println("[SUITE]: kqueue.c");
+    if (kqueue_test_suite() < 0) {
+        r = 1;
+        println("\t❌ Suite failed: kqueue.c");
+    } else {
+        println("\t✅ Suite passed: kqueue.c");
+    }
+
+    return r;
 }
