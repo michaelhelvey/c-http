@@ -117,10 +117,20 @@ int main(int argc, char* argv[])
                     close(event->ident);
                 }
 
-                // 3) else, it succeeded, but we don't actually care about the return value --
-                // handlers are responsible for cleaning themselves up, or keeping the connection
-                // open, or whatever is appropriate based on the way they implement the HTTP
-                // protocol.
+                // 3) else, it succeeded, and we either need to close the connection or re-create
+                // the handler for the next request
+                conn_map_remove(conn_map, event->ident);
+                handler_return_t handler_return = (handler_return_t)return_val;
+
+                if (handler_return == HANDLER_CLOSE) {
+                    close(event->ident);
+                    // and do nothing to re-create it
+                } else {
+                    // otherwise leave it open and re-create the handler
+                    handler_future_t* new_future = new_handler_future(event->ident);
+                    conn_map_insert(conn_map, event->ident, new_future);
+                    register_read_event(event->ident);
+                }
             }
         }
     }

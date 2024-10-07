@@ -2,16 +2,46 @@
 #include "handler.h"
 #include "kqueue.h"
 #include <errno.h>
+#include <strings.h>
+
+bool string_view_equals(string_view_t a, string_view_t b)
+{
+    if (a.len != b.len) {
+        return false;
+    }
+    return strncmp(a.data, b.data, a.len) == 0;
+}
 
 handler_future_t* new_handler_future(i32 fd)
 {
     handler_future_t* self = malloc(sizeof(handler_future_t));
     self->fd = fd;
     self->state = HANDLER_READING;
-    self->read_buf = malloc(1024);
-    self->read_buf_len = 1024;
-    self->read_buf_cursor = 0;
+    // TODO: initialize arena & allocate from there instead of malloc
+    self->read_stream = (read_stream_t) {
+        .data = malloc(1024),
+        .len = 1024,
+        .write_cursor = 0,
+        .read_cursor = 0,
+    };
+    self->write_stream = NULL;
     return self;
+}
+
+void free_handler_future(handler_future_t* self)
+{
+    // TODO: free arena where we allocated read_stream data...leak for now
+    free(self);
+}
+
+void init_write_stream(handler_future_t* self, char* buf, usize len)
+{
+    // TODO: create stream on future arena instead of malloc
+    write_stream_t* stream = malloc(sizeof(write_stream_t));
+    stream->data = buf;
+    stream->len = len;
+    stream->cursor = 0;
+    self->write_stream = stream;
 }
 
 #define READ_CHUNK_SIZE 1024
@@ -21,18 +51,18 @@ handler_future_t* new_handler_future(i32 fd)
         buf = realloc(buf, len);                                                                   \
     }
 
-async_result_t poll_read(handler_future_t* self)
+async_result_t poll_read(i32 fd, read_stream_t* stream)
 {
     // check if we have enough space in the buffer:
-    maybe_realloc(self->read_buf, self->read_buf_len, self->read_buf_cursor, READ_CHUNK_SIZE);
+    maybe_realloc(stream->data, stream->len, stream->write_cursor, READ_CHUNK_SIZE);
 
     // read from the socket:
-    i32 bytes_read = read(self->fd, self->read_buf + self->read_buf_cursor, READ_CHUNK_SIZE);
+    i32 bytes_read = read(fd, stream->data + stream->write_cursor, READ_CHUNK_SIZE);
     if (bytes_read == -1) {
         // 1) we errored because it would block, so we just need to re-register ourselves for the
         // next read
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            register_read_event(self->fd);
+            register_read_event(fd);
             async_result_t res = { .result = POLL_PENDING, .value = NULL };
             return res;
         }
@@ -45,28 +75,43 @@ async_result_t poll_read(handler_future_t* self)
 
     // otherwise we read some bytes:
     println("read %d bytes from client connection", bytes_read);
+    stream->write_cursor += bytes_read;
     return (async_result_t) { .result = POLL_READY, .value = (void*)(size_t)bytes_read };
 }
 
-async_result_t poll_write_buf(handler_future_t* self, char* buf, usize len)
+// TODO: implement request parsing
+// async_result_t poll_parse_request(handler_future_t* self)
+// {
+//     println("parsing request: %ld", self->stream_cursor);
+//     // Advance the read buffer until we have read the request line and the headers, and
+//     // stream_cursor rests at the beginning of the body.  At this point all the string views etc
+//     // in the request struct should be pointing to the correct locations in the read buffer.
+
+//     // I think maybe I want something like this?
+//     // void* request_line;
+//     // ready(poll_parse_request_line(self), request_line);
+
+//     return (async_result_t) { .result = POLL_READY, .value = NULL };
+// }
+
+async_result_t poll_flush_write_buf(i32 fd, write_stream_t* stream)
 {
-    static u32 cursor = 0;
-    i32 bytes_written = write(self->fd, buf + cursor, len - cursor);
+    i32 bytes_written = write(fd, stream->data + stream->cursor, stream->len - stream->cursor);
     while (bytes_written != -1) {
         // we're done
-        if (cursor == len) {
+        if (stream->cursor == stream->len) {
             async_result_t res = { .result = POLL_READY, .value = (void*)0 };
             return res;
         }
 
         // otherwise try again
-        cursor += bytes_written;
-        bytes_written = write(self->fd, buf + cursor, len - cursor);
+        stream->cursor += bytes_written;
+        bytes_written = write(fd, stream->data + stream->cursor, stream->len - stream->cursor);
     }
 
     // 1) we errored because it would block, so we just need to re-register ourselves for the write
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        register_write_event(self->fd);
+        register_write_event(fd);
         async_result_t res = { .result = POLL_PENDING, .value = NULL };
         return res;
     }
@@ -84,23 +129,20 @@ async_result_t poll_handler_future(handler_future_t* self)
         void* _r;
         // TODO: for now, we're only reading once...soon we will implement a stream "read until"
         // mechanism for parsing headers & body stream.
-        ready(poll_read(self), _r);
-        println("read request:\n%s", self->read_buf);
+        ready(poll_read(self->fd, &self->read_stream), _r);
+        println("read request:\n%s", self->read_stream.data);
         self->state = HANDLER_WRITING;
     }
     case HANDLER_WRITING: {
         void* _r;
         char* buf = "HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello World!";
-        ready(poll_write_buf(self, buf, strlen(buf)), _r);
+        init_write_stream(self, buf, strlen(buf));
+        ready(poll_flush_write_buf(self->fd, self->write_stream), _r);
+        // TODO: free write stream and remove it from the future
         self->state = HANDLER_DONE;
     }
-    default:
-        return (async_result_t) { .result = POLL_READY, .value = NULL };
+    default: {
+        return (async_result_t) { .result = POLL_READY, .value = (void*)HANDLER_CLOSE };
     }
-}
-
-void free_handler_future(handler_future_t* self)
-{
-    free(self->read_buf);
-    free(self);
+    }
 }
