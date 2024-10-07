@@ -13,6 +13,7 @@ typedef struct handler_future_t {
     handler_future_state_t state;
     char* read_buf;
     usize read_buf_len;
+    usize read_buf_cursor;
 } handler_future_t;
 
 handler_future_t* new_handler_future(i32 fd);
