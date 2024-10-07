@@ -16,10 +16,14 @@ typedef enum {
 } kqueue_event_t;
 
 /**
- * Listen for events on a file descriptor. Flags specifies whether you want to register for read or
- * write events, or both.
+ * Register yourself for read events on the given file descriptor.
  */
-i32 register_events(u32 fd, usize flags);
+i32 register_read_event(u32 fd);
+
+/**
+ * Register yourself for write events on the given file descriptor.
+ */
+i32 register_write_event(u32 fd);
 
 /**
  * Blocks the thread until one or more registered events are triggered. Returns the number of events
