@@ -12,7 +12,7 @@
         }                                                                                          \
     } while (0)
 
-static region_t* region_create(usize size)
+static region_t* region_create(size_t size)
 {
     region_t* region = malloc(sizeof(region_t));
     region->start = (uintptr_t)malloc(size);
@@ -22,7 +22,7 @@ static region_t* region_create(usize size)
     return region;
 }
 
-arena_t* arena_create(usize region_size)
+arena_t* arena_create(size_t region_size)
 {
     region_t* initial_region = region_create(region_size);
     arena_t* arena = malloc(sizeof(arena_t));
@@ -35,7 +35,7 @@ arena_t* arena_create(usize region_size)
     return arena;
 }
 
-void* arena_alloc(arena_t* arena, usize size, usize align)
+void* arena_alloc(arena_t* arena, size_t size, size_t align)
 {
     // Check that the size is not zero & is not larger than a region
     if (size == 0 || size > arena->region_size) {
@@ -46,8 +46,8 @@ void* arena_alloc(arena_t* arena, usize size, usize align)
     uintptr_t aligned_cursor = align_up(arena->current->free_cursor, align);
 
     // Calculate the amount of free space left in the current region
-    usize bytes_used = aligned_cursor - arena->current->start;
-    usize current_free = arena->current->len - bytes_used;
+    size_t bytes_used = aligned_cursor - arena->current->start;
+    size_t current_free = arena->current->len - bytes_used;
 
     debug_alloc("allocating %zu bytes, current region bytes used = %zu, current free = %zu\n", size,
         bytes_used, current_free);
@@ -103,7 +103,7 @@ void arena_release(arena_t* arena)
         }                                                                                          \
     } while (0)
 
-i32 test_arena_alloc()
+int test_arena_alloc()
 {
     // Allocate an arena with a region size of 12 bytes
     arena_t* arena = arena_create(12);
@@ -124,9 +124,9 @@ i32 test_arena_alloc()
     return 0;
 }
 
-i32 arena_test_suite()
+int arena_test_suite()
 {
-    i32 r = 0;
+    int r = 0;
     if (test_arena_alloc() < 0) {
         r = -1;
         printf("\t❌ test_arena_alloc\n");

@@ -22,7 +22,7 @@ typedef struct region_t {
     // Address of the start of the region in memory
     uintptr_t start;
     // The total length of the region
-    usize len;
+    size_t len;
     // The first available free address in the region
     uintptr_t free_cursor;
     // A pointer to the next region in the arena's linked list
@@ -35,18 +35,18 @@ typedef struct arena_t {
     // The current region we are allocating from
     region_t* current;
     // The size of each region in bytes
-    usize region_size;
+    size_t region_size;
     // The number of regions we have allocated so far
-    usize region_count;
+    size_t region_count;
 } arena_t;
 
 // Allocates a new arena with a single region of the given size.
-arena_t* arena_create(usize region_size);
+arena_t* arena_create(size_t region_size);
 
 // Allocates a new chunk of memory in the arena's current region with the given size and alignment
-void* arena_alloc(arena_t* arena, usize size, usize align);
+void* arena_alloc(arena_t* arena, size_t size, size_t align);
 
 // Releases all memory allocated by the arena, including the arena itself
 void arena_release(arena_t* arena);
 
-i32 arena_test_suite();
+int arena_test_suite();

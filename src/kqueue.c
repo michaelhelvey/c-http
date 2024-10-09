@@ -7,11 +7,11 @@
 #include <time.h>
 #include <unistd.h>
 
-static u32 queue_fd;
+static int queue_fd;
 
 void kqueue_init()
 {
-    i32 r = kqueue();
+    int r = kqueue();
     if (r == -1) {
         perror("kqueue");
         exit(1);
@@ -20,7 +20,7 @@ void kqueue_init()
     queue_fd = r;
 }
 
-i32 register_read_event(u32 fd)
+int register_read_event(int fd)
 {
     struct kevent changelist[1];
     EV_SET(&changelist[0], fd, EVFILT_READ, EV_ADD | EV_ONESHOT, 0, 0, NULL);
@@ -33,7 +33,7 @@ i32 register_read_event(u32 fd)
     return 0;
 }
 
-i32 register_write_event(u32 fd)
+int register_write_event(int fd)
 {
     struct kevent changelist[1];
     EV_SET(&changelist[0], fd, EVFILT_WRITE, EV_ADD | EV_ONESHOT, 0, 0, NULL);
@@ -50,11 +50,11 @@ i32 register_write_event(u32 fd)
 // have in a "ready" state at any one time
 #define KQUEUE_MAX_EVENTS 1024
 struct kevent eventlist[KQUEUE_MAX_EVENTS];
-usize last_event_len = 0;
+size_t last_event_len = 0;
 
-i32 block_until_events()
+int block_until_events()
 {
-    i32 event_count = kevent(queue_fd, NULL, 0, eventlist, KQUEUE_MAX_EVENTS, NULL);
+    int event_count = kevent(queue_fd, NULL, 0, eventlist, KQUEUE_MAX_EVENTS, NULL);
     if (event_count == -1) {
         perror("kevent");
         return -1;
@@ -134,7 +134,7 @@ void* server_thread(void* message)
     return (void*)0;
 }
 
-i32 test_kqueue_register_read_event()
+int test_kqueue_register_read_event()
 {
     kqueue_init();
 
@@ -184,7 +184,7 @@ i32 test_kqueue_register_read_event()
     test_log("[client]: read message: %s\n", buffer);
     assert(strcmp(buffer, message) == 0, "message read from server does not match");
 
-    i32 retval;
+    int retval;
     if (pthread_join(server_thread_id, (void**)&retval) < 0) {
         perror("pthread_join");
         return -1;
@@ -198,9 +198,9 @@ i32 test_kqueue_register_read_event()
     return 0;
 }
 
-i32 kqueue_test_suite()
+int kqueue_test_suite()
 {
-    i32 r = 0;
+    int r = 0;
     if (test_kqueue_register_read_event() < 0) {
         r = -1;
         printf("\t❌ test_kqueue_register_read_event\n");

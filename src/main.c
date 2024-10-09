@@ -10,7 +10,7 @@
 struct option long_options[] = { { "help", no_argument, 0, 'h' },
     { "version", no_argument, 0, 'v' }, { "port", required_argument, 0, 'p' } };
 
-u16 port = 8080;
+int port = 8080;
 bool shutdown = false;
 #define CONN_MAP_SIZE 1024
 
@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
 
     // Initialize subsystems:
     kqueue_init();
-    i32 server_fd = start_server(port);
+    int server_fd = start_server(port);
     register_read_event(server_fd);
     conn_map_t* conn_map = conn_map_new(CONN_MAP_SIZE);
 
@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
         eventlist_iter_t iter = get_eventlist_iter();
         struct kevent* event;
         while ((event = get_next_event(&iter)) != NULL) {
-            if ((i32)event->ident == server_fd) {
+            if ((int)event->ident == server_fd) {
                 // we are ready to accept a new connection:
                 async_result_t result = poll_accept_connection(server_fd);
                 // first of all, we want to re-register the server_fd for read events, since no
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
                     continue;
                 }
 
-                i32 return_val = (i32)(size_t)result.value;
+                int return_val = (int)(size_t)result.value;
 
                 // 2) we successfully accepted a connection.
                 if (result.result == POLL_READY && return_val > 0) {
@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
                     continue;
                 }
 
-                i32 return_val = (i32)(size_t)result.value;
+                int return_val = (int)(size_t)result.value;
                 if (result.result == POLL_READY && return_val < 0) {
                     // 2) our handler failed in some way, we just need to clean up and move on
                     println("failure while handling connection %ld, dropping it.", event->ident);

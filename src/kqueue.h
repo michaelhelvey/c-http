@@ -18,21 +18,21 @@ typedef enum {
 /**
  * Register yourself for read events on the given file descriptor.
  */
-i32 register_read_event(u32 fd);
+int register_read_event(int fd);
 
 /**
  * Register yourself for write events on the given file descriptor.
  */
-i32 register_write_event(u32 fd);
+int register_write_event(int fd);
 
 /**
  * Blocks the thread until one or more registered events are triggered. Returns the number of events
  * that were triggered.
  */
-i32 block_until_events();
+int block_until_events();
 
 typedef struct eventlist_iter_t {
-    usize index;
+    size_t index;
 } eventlist_iter_t;
 
 /**
@@ -45,4 +45,4 @@ eventlist_iter_t get_eventlist_iter();
  */
 struct kevent* get_next_event(eventlist_iter_t* iter);
 
-i32 kqueue_test_suite();
+int kqueue_test_suite();

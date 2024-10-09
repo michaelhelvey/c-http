@@ -1,20 +1,20 @@
 #include "conn.h"
 #include "handler.h"
 
-conn_map_t* conn_map_new(usize capacity)
+conn_map_t* conn_map_new(size_t capacity)
 {
     conn_map_t* self = malloc(sizeof(conn_map_t));
     self->cap = capacity;
     self->buckets = malloc(sizeof(conn_map_entry_t*) * capacity);
-    for (usize i = 0; i < capacity; i++) {
+    for (size_t i = 0; i < capacity; i++) {
         self->buckets[i] = NULL;
     }
     return self;
 }
 
-void conn_map_insert(conn_map_t* self, i32 fd, handler_future_t* future)
+void conn_map_insert(conn_map_t* self, int fd, handler_future_t* future)
 {
-    usize index = fd % self->cap;
+    size_t index = fd % self->cap;
     conn_map_entry_t* prev = NULL;
     conn_map_entry_t* existing = self->buckets[index];
 
@@ -44,9 +44,9 @@ void conn_map_insert(conn_map_t* self, i32 fd, handler_future_t* future)
     }
 }
 
-handler_future_t* conn_map_get(conn_map_t* self, i32 fd)
+handler_future_t* conn_map_get(conn_map_t* self, int fd)
 {
-    usize index = fd % self->cap;
+    size_t index = fd % self->cap;
     conn_map_entry_t* existing = self->buckets[index];
     while (existing != NULL) {
         if (existing->fd == fd) {
@@ -57,9 +57,9 @@ handler_future_t* conn_map_get(conn_map_t* self, i32 fd)
     return NULL;
 }
 
-void conn_map_remove(conn_map_t* self, i32 fd)
+void conn_map_remove(conn_map_t* self, int fd)
 {
-    usize index = fd % self->cap;
+    size_t index = fd % self->cap;
     conn_map_entry_t* prev = NULL;
     conn_map_entry_t* existing = self->buckets[index];
     while (existing != NULL) {
@@ -99,7 +99,7 @@ void conn_map_remove(conn_map_t* self, i32 fd)
         }                                                                                          \
     } while (0)
 
-i32 test_conn_map_insert_get_remove()
+int test_conn_map_insert_get_remove()
 {
     conn_map_t* map = conn_map_new(10);
     handler_future_t* future = new_handler_future(24);
@@ -115,9 +115,9 @@ i32 test_conn_map_insert_get_remove()
     return 0;
 }
 
-i32 conn_test_suite()
+int conn_test_suite()
 {
-    i32 r = 0;
+    int r = 0;
     if (test_conn_map_insert_get_remove() < 0) {
         r = -1;
         printf("\t❌ test_conn_map_insert_get_remove\n");

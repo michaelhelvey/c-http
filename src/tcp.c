@@ -5,10 +5,10 @@
 #include <sys/fcntl.h>
 #include <sys/socket.h>
 
-i32 start_server(u16 port)
+int start_server(int port)
 {
 
-    i32 server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
         perror("socket");
         exit(1);
@@ -17,7 +17,7 @@ i32 start_server(u16 port)
     struct sockaddr_in server_addr
         = { .sin_family = AF_INET, .sin_port = htons(port), .sin_addr.s_addr = INADDR_ANY };
 
-    i32 opt = 1;
+    int opt = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         perror("setsockopt");
         exit(1);
@@ -41,9 +41,9 @@ i32 start_server(u16 port)
     return server_fd;
 }
 
-async_result_t poll_accept_connection(i32 server_fd)
+async_result_t poll_accept_connection(int server_fd)
 {
-    i32 client_fd = accept(server_fd, NULL, NULL);
+    int client_fd = accept(server_fd, NULL, NULL);
 
     if (errno == EWOULDBLOCK) {
         return (async_result_t) { .result = POLL_PENDING, .value = NULL };

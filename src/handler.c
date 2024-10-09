@@ -13,7 +13,7 @@ bool string_view_equals(string_view_t a, string_view_t b)
     return strncmp(a.data, b.data, a.len) == 0;
 }
 
-handler_future_t* new_handler_future(i32 fd)
+handler_future_t* new_handler_future(int fd)
 {
     handler_future_t* self = malloc(sizeof(handler_future_t));
     self->fd = fd;
@@ -42,7 +42,7 @@ void free_handler_future(handler_future_t* self)
     free(self);
 }
 
-void init_write_stream(handler_future_t* self, char* buf, usize len)
+void init_write_stream(handler_future_t* self, char* buf, size_t len)
 {
     write_stream_t* stream
         = arena_alloc(self->arena, sizeof(write_stream_t), alignof(write_stream_t));
@@ -59,13 +59,13 @@ void init_write_stream(handler_future_t* self, char* buf, usize len)
         buf = realloc(buf, len);                                                                   \
     }
 
-async_result_t poll_read(i32 fd, read_stream_t* stream)
+async_result_t poll_read(int fd, read_stream_t* stream)
 {
     // check if we have enough space in the buffer:
     maybe_realloc(stream->data, stream->len, stream->write_cursor, READ_CHUNK_SIZE);
 
     // read from the socket:
-    i32 bytes_read = read(fd, stream->data + stream->write_cursor, READ_CHUNK_SIZE);
+    int bytes_read = read(fd, stream->data + stream->write_cursor, READ_CHUNK_SIZE);
     if (bytes_read == -1) {
         // 1) we errored because it would block, so we just need to re-register ourselves for the
         // next read
@@ -108,9 +108,9 @@ async_result_t poll_read(i32 fd, read_stream_t* stream)
 //     return (async_result_t) { .result = POLL_READY, .value = NULL };
 // }
 
-async_result_t poll_flush_write_buf(i32 fd, write_stream_t* stream)
+async_result_t poll_flush_write_buf(int fd, write_stream_t* stream)
 {
-    i32 bytes_written = write(fd, stream->data + stream->cursor, stream->len - stream->cursor);
+    int bytes_written = write(fd, stream->data + stream->cursor, stream->len - stream->cursor);
     while (bytes_written != -1) {
         // we're done
         if (stream->cursor == stream->len) {
