@@ -1,5 +1,6 @@
 #pragma once
 
+#include "arena.h"
 #include "common.h"
 
 // A string view represents a pointer into the read buffer owned by the HTTP request handler. During
@@ -62,6 +63,10 @@ typedef struct write_stream_t {
 typedef struct handler_future_t {
     // The client file descriptor we're handling
     i32 fd;
+    // The memory arena that we use to allocate memory for the request we are parsing
+    arena_t* arena;
+    // The request we are currently parsing
+    request_t request;
     // The state of the future, determining which "point" in the handler we should resume when
     // we are polled again.
     handler_future_state_t state;

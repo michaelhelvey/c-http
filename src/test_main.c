@@ -1,4 +1,4 @@
-#include "common.h"
+#include "arena.h"
 #include "conn.h"
 #include "kqueue.h"
 
@@ -7,21 +7,30 @@ int main()
     int r = 0;
 
     // kqueue.c
-    println("[SUITE]: kqueue.c");
+    printf("[SUITE]: kqueue.c\n");
     if (kqueue_test_suite() < 0) {
         r = 1;
-        println("\t❌ Suite failed: kqueue.c");
+        printf("\t❌ Suite failed: kqueue.c\n");
     } else {
-        println("\t✅ Suite passed: kqueue.c");
+        printf("\t✅ Suite passed: kqueue.c\n");
     }
 
     // conn.c
-    println("[SUITE]: conn.c");
+    printf("[SUITE]: conn.c\n");
     if (conn_test_suite() < 0) {
         r = 1;
-        println("\t❌ Suite failed: conn.c");
+        printf("\t❌ Suite failed: conn.c\n");
     } else {
-        println("\t✅ Suite passed: conn.c");
+        printf("\t✅ Suite passed: conn.c\n");
+    }
+
+    // arena.c
+    printf("[SUITE]: arena.c\n");
+    if (arena_test_suite() < 0) {
+        r = 1;
+        printf("\t❌ Suite failed: arena.c\n");
+    } else {
+        printf("\t✅ Suite passed: arena.c\n");
     }
 
     return r;

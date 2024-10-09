@@ -1,8 +1,9 @@
+#include "arena.h"
 #include "common.h"
 #include "handler.h"
 #include "kqueue.h"
 #include <errno.h>
-#include <strings.h>
+#include <stdalign.h>
 
 bool string_view_equals(string_view_t a, string_view_t b)
 {
@@ -17,7 +18,13 @@ handler_future_t* new_handler_future(i32 fd)
     handler_future_t* self = malloc(sizeof(handler_future_t));
     self->fd = fd;
     self->state = HANDLER_READING;
-    // TODO: initialize arena & allocate from there instead of malloc
+    self->arena = arena_create(1024);
+    self->request = (request_t) {
+        .method = { .data = NULL, .len = 0 },
+        .path = { .data = NULL, .len = 0 },
+        .version = { .data = NULL, .len = 0 },
+        .headers = NULL,
+    };
     self->read_stream = (read_stream_t) {
         .data = malloc(1024),
         .len = 1024,
@@ -30,14 +37,15 @@ handler_future_t* new_handler_future(i32 fd)
 
 void free_handler_future(handler_future_t* self)
 {
-    // TODO: free arena where we allocated read_stream data...leak for now
+    arena_release(self->arena);
+    free(self->read_stream.data);
     free(self);
 }
 
 void init_write_stream(handler_future_t* self, char* buf, usize len)
 {
-    // TODO: create stream on future arena instead of malloc
-    write_stream_t* stream = malloc(sizeof(write_stream_t));
+    write_stream_t* stream
+        = arena_alloc(self->arena, sizeof(write_stream_t), alignof(write_stream_t));
     stream->data = buf;
     stream->len = len;
     stream->cursor = 0;
@@ -78,6 +86,12 @@ async_result_t poll_read(i32 fd, read_stream_t* stream)
     stream->write_cursor += bytes_read;
     return (async_result_t) { .result = POLL_READY, .value = (void*)(size_t)bytes_read };
 }
+
+// The next challenge we have to face is that we need to know where in the request we've parsed up
+// to before we call poll_read again. I think that the best way to do this is to read until we get
+// the double new line that means the headers are done, and to do this before we even start parsing.
+// So we have the following states 1) reading headers 2) parsing request (not really a state, we can
+// just do it sync after reading the headers) 3) reading body (?) 4) writing
 
 // TODO: implement request parsing
 // async_result_t poll_parse_request(handler_future_t* self)
@@ -138,7 +152,6 @@ async_result_t poll_handler_future(handler_future_t* self)
         char* buf = "HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello World!";
         init_write_stream(self, buf, strlen(buf));
         ready(poll_flush_write_buf(self->fd, self->write_stream), _r);
-        // TODO: free write stream and remove it from the future
         self->state = HANDLER_DONE;
     }
     default: {

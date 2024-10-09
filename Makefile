@@ -1,4 +1,4 @@
-OBJECTS = kqueue conn handler tcp
+OBJECTS = kqueue conn handler tcp arena
 
 SRC_DIR = src
 BUILD_DIR = build

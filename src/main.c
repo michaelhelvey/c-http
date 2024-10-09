@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
 
                 i32 return_val = (i32)(size_t)result.value;
                 if (result.result == POLL_READY && return_val < 0) {
-                    // 2) our handler failed in some way, we just need to clean up and moveon
+                    // 2) our handler failed in some way, we just need to clean up and move on
                     println("failure while handling connection %ld, dropping it.", event->ident);
                     conn_map_remove(conn_map, event->ident);
                     close(event->ident);

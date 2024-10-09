@@ -1,7 +1,6 @@
 #include "kqueue.h"
 #include <pthread.h>
 #include <stdio.h>
-#include <sys/_pthread/_pthread_t.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/wait.h>
