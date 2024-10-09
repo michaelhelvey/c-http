@@ -64,6 +64,7 @@ void conn_map_remove(conn_map_t* self, int fd)
     conn_map_entry_t* existing = self->buckets[index];
     while (existing != NULL) {
         if (existing->fd == fd) {
+            // we found the entry, now we need to remove it
             if (prev == NULL) {
                 self->buckets[index] = existing->next;
             } else {

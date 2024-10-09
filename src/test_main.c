@@ -1,5 +1,6 @@
 #include "arena.h"
 #include "conn.h"
+#include "handler.h"
 #include "kqueue.h"
 
 int main()
@@ -31,6 +32,15 @@ int main()
         printf("\t❌ Suite failed: arena.c\n");
     } else {
         printf("\t✅ Suite passed: arena.c\n");
+    }
+
+    // handler.c
+    printf("[SUITE]: handler.c\n");
+    if (handler_test_suite() < 0) {
+        r = 1;
+        printf("\t❌ Suite failed: handler.c\n");
+    } else {
+        printf("\t✅ Suite passed: handler.c\n");
     }
 
     return r;

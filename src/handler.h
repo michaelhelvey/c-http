@@ -14,14 +14,13 @@ typedef struct string_view_t {
 bool string_view_equals(string_view_t a, string_view_t b);
 
 typedef struct header_value_t {
-    string_view_t* value;
+    string_view_t name;
     struct header_value_t* next;
 } header_value_t;
 
 typedef struct header_t {
     string_view_t key;
     header_value_t value;
-    // FIXME: write a proper hash map for this with string hashing etc.
     struct header_t* next;
 } header_t;
 
@@ -33,7 +32,8 @@ typedef struct request_t {
 } request_t;
 
 typedef enum handler_future_state_t {
-    HANDLER_READING,
+    HANDLER_READING_HEADERS,
+    HANDLER_READING_BODY,
     HANDLER_WRITING,
     HANDLER_DONE,
 } handler_future_state_t;
@@ -48,6 +48,9 @@ typedef struct read_stream_t {
     size_t write_cursor;
     // How far the user has actually read from the stream via calls like `read_line`.
     size_t read_cursor;
+    // The index into the buffer where the request body begins (after the \r\n\r\n delimiter). A
+    // zero value means that this has not been found yet.
+    size_t body_start_idx;
 } read_stream_t;
 
 typedef struct write_stream_t {
@@ -87,3 +90,5 @@ handler_future_t* new_handler_future(int fd);
 async_result_t poll_handler_future(handler_future_t* self);
 
 void free_handler_future(handler_future_t* self);
+
+int handler_test_suite();

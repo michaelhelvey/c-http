@@ -12,15 +12,18 @@
 #include <unistd.h>
 
 #define VERSION "0.0.1"
+#define DEBUG_LOG 0
 
 // While this is a bit silly as it stands, eventually we can replace this with a more sophisticated
 // logging system.
 #define println(fmt, ...)                                                                          \
     do {                                                                                           \
-        time_t now = time(NULL);                                                                   \
-        char time_buf[20];                                                                         \
-        strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", localtime(&now));                \
-        fprintf(stderr, "%s: %s:%d: " fmt "\n", time_buf, __FILE__, __LINE__, ##__VA_ARGS__);      \
+        if (DEBUG_LOG) {                                                                           \
+            time_t now = time(NULL);                                                               \
+            char time_buf[20];                                                                     \
+            strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", localtime(&now));            \
+            fprintf(stderr, "%s: %s:%d: " fmt "\n", time_buf, __FILE__, __LINE__, ##__VA_ARGS__);  \
+        }                                                                                          \
     } while (0)
 
 #define panic(fmt, ...)                                                                            \

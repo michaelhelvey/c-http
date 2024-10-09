@@ -66,12 +66,14 @@ int main(int argc, char* argv[])
             if ((int)event->ident == server_fd) {
                 // we are ready to accept a new connection:
                 async_result_t result = poll_accept_connection(server_fd);
-                // first of all, we want to re-register the server_fd for read events, since no
-                // matter what happens we want to be able to accept new connections
+                // first of all, we want to re-register the server_fd for read events,
+                // since no matter what happens we want to be able to accept new
+                // connections
                 register_read_event(server_fd);
 
                 // There are 3 possible outcomes:
-                // 1) kqueue lied to us and we're not actually ready to accept a connection.
+                // 1) kqueue lied to us and we're not actually ready to accept a
+                // connection.
                 if (result.result == POLL_PENDING) {
                     // nothing to do, since we've already re-registered the server_fd
                     continue;
@@ -81,7 +83,8 @@ int main(int argc, char* argv[])
 
                 // 2) we successfully accepted a connection.
                 if (result.result == POLL_READY && return_val > 0) {
-                    // return_val is a file descriptor that we should register as an HTTP handler
+                    // return_val is a file descriptor that we should register as an HTTP
+                    // handler
                     handler_future_t* future = new_handler_future(return_val);
                     conn_map_insert(conn_map, return_val, future);
                     register_read_event(return_val);
@@ -102,33 +105,34 @@ int main(int argc, char* argv[])
 
                 async_result_t result = poll_handler_future(future);
                 // Once again, there are 3 possible outcomes:
-                // 1) kqueue lied to us and we're not actually ready to read from the connection.
+                // 1) kqueue lied to us and we're not actually ready to read from the
+                // connection.
                 if (result.result == POLL_PENDING) {
-                    // nothing to do, since handler futures are responsible for re-registring
-                    // themselves
+                    // nothing to do, since handler futures are responsible for
+                    // re-registering themselves
                     continue;
                 }
 
-                int return_val = (int)(size_t)result.value;
+                long return_val = (long)result.value;
                 if (result.result == POLL_READY && return_val < 0) {
-                    // 2) our handler failed in some way, we just need to clean up and move on
+                    // 2) our handler failed in some way, we just need to clean up and
+                    // move on
                     println("failure while handling connection %ld, dropping it.", event->ident);
                     conn_map_remove(conn_map, event->ident);
                     close(event->ident);
+                    continue;
                 }
 
-                // 3) else, it succeeded, and we either need to close the connection or re-create
-                // the handler for the next request
-                conn_map_remove(conn_map, event->ident);
+                // 3) else, it succeeded, and we either need to close the connection or
+                // re-create the handler for the next request
                 handler_return_t handler_return = (handler_return_t)return_val;
 
                 if (handler_return == HANDLER_CLOSE) {
+                    println("HTTP handler future completed with CLOSE status");
+                    conn_map_remove(conn_map, event->ident);
                     close(event->ident);
-                    // and do nothing to re-create it
                 } else {
-                    // otherwise leave it open and re-create the handler
-                    handler_future_t* new_future = new_handler_future(event->ident);
-                    conn_map_insert(conn_map, event->ident, new_future);
+                    println("HTTP handler future completed with KEEP_ALIVE status");
                     register_read_event(event->ident);
                 }
             }
