@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <stdalign.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #define HEADERS_ARENA_SIZE 4096
@@ -32,6 +33,7 @@ static void init_handler_future(handler_future_t* self, int fd)
         .method = { .data = NULL, .len = 0 },
         .path = { .data = NULL, .len = 0 },
         .version = { .data = NULL, .len = 0 },
+        .content_length = 0,
         .headers = NULL,
     };
 
@@ -225,6 +227,37 @@ static header_t* get_header(request_t* request, char* key)
     return NULL;
 }
 
+// Gets the content-length of the body. Returns 0 is there is no body, and -1 if there is an error
+// in parsing the header.
+static long get_content_length(request_t* request)
+{
+    if (request->content_length != 0) {
+        return request->content_length;
+    }
+
+    header_t* header = get_header(request, "Content-Length");
+    if (!header) {
+        return 0;
+    }
+
+    assert(header->value.next == NULL && "multiple Content-Length header values are invalid");
+
+    // enough space for a cstr of the value
+    char str_buf[header->value.name.len + 1];
+    memcpy(str_buf, header->value.name.data, header->value.name.len);
+    str_buf[header->value.name.len] = '\0';
+
+    long r;
+    if ((r = strtol(str_buf, NULL, 10)) == 0) {
+        perror("strtol: unable to parse Content-Length header value");
+        return -1;
+    }
+
+    request->content_length = r;
+
+    return r;
+}
+
 static void insert_header(request_t* request, header_t* header)
 {
     if (!request->headers) {
@@ -346,8 +379,9 @@ static void parse_request(handler_future_t* self)
     }
 }
 
-static void pretty_print_request(request_t* request)
+static void pretty_print_request(handler_future_t* self)
 {
+    request_t* request = &self->request;
     printf("method=");
     fwrite(request->method.data, 1, request->method.len, stdout);
 
@@ -381,7 +415,45 @@ static void pretty_print_request(request_t* request)
             printf(", ");
         }
     }
-    printf("}\n");
+    printf("} body=\"");
+
+    if (request->content_length > 0) {
+        fwrite(self->read_stream.data + self->read_stream.body_start_idx, 1,
+            request->content_length, stdout);
+    }
+
+    printf("\"\n");
+}
+
+async_result_t poll_read_body(handler_future_t* self)
+{
+    size_t body_start = self->read_stream.body_start_idx;
+    long content_length = get_content_length(&self->request);
+
+    if (content_length == -1) {
+        return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
+    }
+
+    if (content_length == 0) {
+        return (async_result_t) { .result = POLL_READY, .value = (void*)0 };
+    }
+
+    // How far we need to read the write_cursor up to ensure that the whole body is in
+    // our buffer:
+    size_t read_up_to = body_start + content_length;
+
+    while (self->read_stream.write_cursor < read_up_to) {
+        void* _r;
+        ready(poll_read(self->fd, &self->read_stream), _r);
+        long ret_val = (long)_r;
+        if (ret_val < 0) {
+            return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
+        }
+        self->read_stream.write_cursor += ret_val;
+    }
+
+    // At this point the whole body is buffered in our read stream:
+    return (async_result_t) { .result = POLL_READY, .value = (void*)0 };
 }
 
 async_result_t poll_handler_future(handler_future_t* self)
@@ -396,14 +468,17 @@ async_result_t poll_handler_future(handler_future_t* self)
                 return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
             }
             parse_request(self);
-            pretty_print_request(&self->request);
             self->state = HANDLER_READING_BODY;
             break;
         }
         case HANDLER_READING_BODY: {
-            // We are just skipping the body for now, although soon we are going to
-            // at least have to forward past it to the next request if we want to
-            // support any request types other than GET
+            void* _r;
+            ready(poll_read_body(self), _r);
+            long ret_val = (long)_r;
+            if (ret_val < 0) {
+                return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
+            }
+            pretty_print_request(self);
             self->state = HANDLER_WRITING;
             break;
         }

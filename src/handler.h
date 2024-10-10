@@ -28,6 +28,7 @@ typedef struct request_t {
     string_view_t method;
     string_view_t path;
     string_view_t version;
+    long content_length;
     header_t* headers;
 } request_t;
 

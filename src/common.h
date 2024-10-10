@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #define VERSION "0.0.1"
-#define DEBUG_LOG 0
+#define DEBUG_LOG 1
 
 // While this is a bit silly as it stands, eventually we can replace this with a more sophisticated
 // logging system.

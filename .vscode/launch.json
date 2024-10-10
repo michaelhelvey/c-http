@@ -9,7 +9,7 @@
       "request": "launch",
       "preLaunchTask": "Build",
       "name": "Debug",
-      "program": "${workspaceFolder}/build/http_test",
+      "program": "${workspaceFolder}/build/http",
       "args": [],
       "cwd": "${workspaceFolder}"
     }
