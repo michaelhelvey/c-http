@@ -2,12 +2,13 @@
 
 #include "arena.h"
 #include "common.h"
+#include "response.h"
 
 // A string view represents a pointer into the read buffer owned by the HTTP request handler. During
 // parsing, we simply identify the starting index and length of the string we're interested in, and
 // then we can use this view to access the string without copying it.
 typedef struct string_view_t {
-    const char* data;
+    char* data;
     size_t len;
 } string_view_t;
 
@@ -54,16 +55,6 @@ typedef struct read_stream_t {
     size_t body_start_idx;
 } read_stream_t;
 
-typedef struct write_stream_t {
-    // The buffer of data that we are trying to write. This memory is expected to be owned by the
-    // caller.
-    char* data;
-    // The total length of the buffer
-    size_t len;
-    // How far we have written so far, so we know where to resume on the next write call.
-    size_t cursor;
-} write_stream_t;
-
 typedef struct handler_future_t {
     // The client file descriptor we're handling
     int fd;
@@ -76,8 +67,7 @@ typedef struct handler_future_t {
     handler_future_state_t state;
     // Buffer state that we read into from the client fd
     read_stream_t read_stream;
-    // Buffer state that we write into to the client fd
-    write_stream_t* write_stream;
+    response_t* response;
 } handler_future_t;
 
 // Values that can be returned as the `value` parameter of the handler's async result.

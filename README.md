@@ -1,8 +1,8 @@
 # c-http
 
-A simple HTTP server for static files & reverse proxying. Uses single-threaded async/io on top of
-kqueue. Not truly spec compliant -- my short-term goal is to implement some subset of HTTP 1.1. This
-whole project is just for fun -- I gotta scratch my coding itch on paternity leave somehow.
+A simple HTTP server for static files. Uses single-threaded async/io on top of kqueue. Not truly
+spec compliant at all -- my short-term goal is to implement some subset of HTTP 1.1. This whole
+project is just for fun -- I gotta scratch my coding itch on paternity leave somehow.
 
 ## Getting Started
 

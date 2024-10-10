@@ -1,7 +1,9 @@
 #include "arena.h"
 #include "common.h"
+#include "fs.h"
 #include "handler.h"
 #include "kqueue.h"
+#include "response.h"
 #include <assert.h>
 #include <errno.h>
 #include <stdalign.h>
@@ -49,7 +51,12 @@ static void init_handler_future(handler_future_t* self, int fd)
         .body_start_idx = 0,
     };
     bzero(self->read_stream.data, 1024);
-    self->write_stream = NULL;
+
+    if (self->response) {
+        response_free(self->response);
+    }
+
+    self->response = response_new();
 }
 
 handler_future_t* new_handler_future(int fd)
@@ -65,16 +72,6 @@ void free_handler_future(handler_future_t* self)
     arena_release(self->arena);
     free(self->read_stream.data);
     free(self);
-}
-
-static void init_write_stream(handler_future_t* self, char* buf, size_t len)
-{
-    write_stream_t* stream
-        = arena_alloc(self->arena, sizeof(write_stream_t), alignof(write_stream_t));
-    stream->data = buf;
-    stream->len = len;
-    stream->cursor = 0;
-    self->write_stream = stream;
 }
 
 #define READ_CHUNK_SIZE 1024
@@ -183,35 +180,6 @@ static async_result_t poll_read_headers(handler_future_t* self)
     // Reset our read_cursor so our parser can read from the beginning
     self->read_stream.read_cursor = 0;
     return (async_result_t) { .result = POLL_READY, .value = (void*)0 };
-}
-
-static async_result_t poll_flush_write_buf(int fd, write_stream_t* stream)
-{
-    int bytes_written = write(fd, stream->data + stream->cursor, stream->len - stream->cursor);
-    while (bytes_written != -1) {
-        // we're done
-        if (stream->cursor == stream->len) {
-            async_result_t res = { .result = POLL_READY, .value = (void*)0 };
-            return res;
-        }
-
-        // otherwise try again
-        stream->cursor += bytes_written;
-        bytes_written = write(fd, stream->data + stream->cursor, stream->len - stream->cursor);
-    }
-
-    // 1) we errored because it would block, so we just need to re-register
-    // ourselves for the write
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        register_write_event(fd);
-        async_result_t res = { .result = POLL_PENDING, .value = NULL };
-        return res;
-    }
-
-    // else it's a real error, we should return it:
-    perror("write");
-    async_result_t res = { .result = POLL_READY, .value = (void*)-1 };
-    return res;
 }
 
 static header_t* get_header(request_t* request, char* key)
@@ -483,10 +451,30 @@ async_result_t poll_handler_future(handler_future_t* self)
             break;
         }
         case HANDLER_WRITING: {
+            fs_read_result_t* read_result
+                = fs_read(self->request.path.data, self->request.path.len);
+
+            // TODO: return an actual error to the client (e.g. a 404)
+            if (!read_result) {
+                return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
+            }
+
+            self->response->status_code = "200";
+            self->response->status_text = "OK";
+
+            response_write_header_str(self->response, "Content-Type", read_result->content_type);
+            response_write_header_int(
+                self->response, "Content-Length", read_result->content_length);
+            response_write_body(self->response, read_result->buffer, read_result->content_length);
+
             void* _r;
-            char* buf = "HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello World!";
-            init_write_stream(self, buf, strlen(buf));
-            ready(poll_flush_write_buf(self->fd, self->write_stream), _r);
+            ready(poll_response_write_buffer(self->response, self->fd), _r);
+            free_read_result(read_result);
+            long ret_val = (long)_r;
+            if (ret_val < 0) {
+                return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
+            }
+
             self->state = HANDLER_DONE;
             break;
         }
