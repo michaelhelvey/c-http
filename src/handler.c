@@ -18,7 +18,7 @@ bool string_view_equals(string_view_t a, string_view_t b)
     return strncmp(a.data, b.data, a.len) == 0;
 }
 
-void init_handler_future(handler_future_t* self, int fd)
+static void init_handler_future(handler_future_t* self, int fd)
 {
     self->fd = fd;
     self->state = HANDLER_READING_HEADERS;
@@ -53,6 +53,7 @@ void init_handler_future(handler_future_t* self, int fd)
 handler_future_t* new_handler_future(int fd)
 {
     handler_future_t* self = malloc(sizeof(handler_future_t));
+    bzero(self, sizeof(handler_future_t));
     init_handler_future(self, fd);
     return self;
 }
@@ -64,7 +65,7 @@ void free_handler_future(handler_future_t* self)
     free(self);
 }
 
-void init_write_stream(handler_future_t* self, char* buf, size_t len)
+static void init_write_stream(handler_future_t* self, char* buf, size_t len)
 {
     write_stream_t* stream
         = arena_alloc(self->arena, sizeof(write_stream_t), alignof(write_stream_t));
@@ -81,7 +82,7 @@ void init_write_stream(handler_future_t* self, char* buf, size_t len)
         buf = realloc(buf, len);                                                                   \
     }
 
-async_result_t poll_read(int fd, read_stream_t* stream)
+static async_result_t poll_read(int fd, read_stream_t* stream)
 {
     // check if we have enough space in the buffer:
     maybe_realloc(stream->data, stream->len, stream->write_cursor, READ_CHUNK_SIZE);
@@ -118,9 +119,9 @@ async_result_t poll_read(int fd, read_stream_t* stream)
     return (async_result_t) { .result = POLL_READY, .value = (void*)(size_t)bytes_read };
 }
 
-int max(int a, int b) { return a > b ? a : b; }
+static int max(int a, int b) { return a > b ? a : b; }
 
-int boyer_moore_search(char* haystack, char* needle)
+static int boyer_moore_search(char* haystack, char* needle)
 {
     int m = strlen(needle);
     int n = strlen(haystack);
@@ -151,7 +152,7 @@ int boyer_moore_search(char* haystack, char* needle)
     return -1;
 }
 
-async_result_t poll_read_headers(handler_future_t* self)
+static async_result_t poll_read_headers(handler_future_t* self)
 {
     char* haystack = self->read_stream.data + self->read_stream.read_cursor;
     char* needle = "\r\n\r\n";
@@ -182,7 +183,7 @@ async_result_t poll_read_headers(handler_future_t* self)
     return (async_result_t) { .result = POLL_READY, .value = (void*)0 };
 }
 
-async_result_t poll_flush_write_buf(int fd, write_stream_t* stream)
+static async_result_t poll_flush_write_buf(int fd, write_stream_t* stream)
 {
     int bytes_written = write(fd, stream->data + stream->cursor, stream->len - stream->cursor);
     while (bytes_written != -1) {
@@ -211,7 +212,7 @@ async_result_t poll_flush_write_buf(int fd, write_stream_t* stream)
     return res;
 }
 
-header_t* get_header(request_t* request, char* key)
+static header_t* get_header(request_t* request, char* key)
 {
     header_t* current = request->headers;
     while (current) {
@@ -224,7 +225,7 @@ header_t* get_header(request_t* request, char* key)
     return NULL;
 }
 
-void insert_header(request_t* request, header_t* header)
+static void insert_header(request_t* request, header_t* header)
 {
     if (!request->headers) {
         request->headers = header;
@@ -258,7 +259,7 @@ void insert_header(request_t* request, header_t* header)
 // At this point we know know that everything up to the body has been read, so
 // we can parse the request line and headers into the request struct that we
 // own.
-void parse_request(handler_future_t* self)
+static void parse_request(handler_future_t* self)
 {
     request_t* request = &self->request;
     read_stream_t* stream = &self->read_stream;
@@ -345,7 +346,7 @@ void parse_request(handler_future_t* self)
     }
 }
 
-void pretty_print_request(request_t* request)
+static void pretty_print_request(request_t* request)
 {
     printf("method=");
     fwrite(request->method.data, 1, request->method.len, stdout);
@@ -450,7 +451,7 @@ async_result_t poll_handler_future(handler_future_t* self)
         }                                                                                          \
     } while (0)
 
-int test_header_insertion()
+static int test_header_insertion()
 {
     // Scenario 1: inserting a header into an empty request
     char* buf = "Accept: text/html";
@@ -504,7 +505,7 @@ int test_header_insertion()
     return 0;
 }
 
-int test_string_search()
+static int test_string_search()
 {
     char* haystack = "hello world";
     char* needle = "world";
