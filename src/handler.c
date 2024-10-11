@@ -56,6 +56,11 @@ static void init_handler_future(handler_future_t* self, int fd)
         response_free(self->response);
     }
 
+    if (self->read_result) {
+        free_read_result(self->read_result);
+    }
+
+    self->read_result = NULL;
     self->response = response_new();
 }
 
@@ -447,32 +452,45 @@ async_result_t poll_handler_future(handler_future_t* self)
                 return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
             }
             pretty_print_request(self);
+            fs_read_result_t* read_result
+                = fs_read(self->request.path.data, self->request.path.len);
+
+            self->read_result = read_result;
             self->state = HANDLER_WRITING;
             break;
         }
         case HANDLER_WRITING: {
-            fs_read_result_t* read_result
-                = fs_read(self->request.path.data, self->request.path.len);
-
+            fs_read_result_t* read_result = self->read_result;
             // TODO: return an actual error to the client (e.g. a 404)
             if (!read_result) {
-                return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
-            }
+                self->response->status_code = "404";
+                self->response->status_text = "Not Found";
+                response_write_header_str(self->response, "Content-Length", "0");
+                void* _r;
+                ready(poll_response_write_buffer(self->response, self->fd), _r);
+                long ret_val = (long)_r;
 
-            self->response->status_code = "200";
-            self->response->status_text = "OK";
+                if (ret_val < 0) {
+                    return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
+                }
+            } else {
+                self->response->status_code = "200";
+                self->response->status_text = "OK";
 
-            response_write_header_str(self->response, "Content-Type", read_result->content_type);
-            response_write_header_int(
-                self->response, "Content-Length", read_result->content_length);
-            response_write_body(self->response, read_result->buffer, read_result->content_length);
+                response_write_header_str(
+                    self->response, "Content-Type", read_result->content_type);
+                response_write_header_int(
+                    self->response, "Content-Length", read_result->content_length);
+                response_write_body(
+                    self->response, read_result->buffer, read_result->content_length);
 
-            void* _r;
-            ready(poll_response_write_buffer(self->response, self->fd), _r);
-            free_read_result(read_result);
-            long ret_val = (long)_r;
-            if (ret_val < 0) {
-                return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
+                void* _r;
+                ready(poll_response_write_buffer(self->response, self->fd), _r);
+                long ret_val = (long)_r;
+
+                if (ret_val < 0) {
+                    return (async_result_t) { .result = POLL_READY, .value = (void*)-1 };
+                }
             }
 
             self->state = HANDLER_DONE;

@@ -130,16 +130,18 @@ async_result_t poll_response_write_buffer(response_t* self, int fd)
             write_bytes(&self->write_buffer, self->status_code, strlen(self->status_code));
             write_bytes(&self->write_buffer, " ", 1);
             write_bytes(&self->write_buffer, self->status_text, strlen(self->status_text));
-            // This line here somehow trims off the first character of the headers
             write_bytes(&self->write_buffer, "\r\n", 2);
 
-            // headers:
-            write_bytes(&self->write_buffer, self->headers.data, self->headers.cursor);
+            if (self->headers.len > 0) {
+                // headers:
+                write_bytes(&self->write_buffer, self->headers.data, self->headers.cursor);
+            }
             write_bytes(&self->write_buffer, "\r\n", 2);
 
-            // body:
-             write_bytes(&self->write_buffer, self->body, self->body_len);
-            // now that we have written everything, we need to reset the cursor for writing
+            if (self->body_len > 0) {
+                write_bytes(&self->write_buffer, self->body, self->body_len);
+            }
+
             self->write_buffer.cursor = 0;
             self->state = RESPONSE_POLLING;
             break;

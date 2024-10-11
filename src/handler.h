@@ -2,6 +2,7 @@
 
 #include "arena.h"
 #include "common.h"
+#include "fs.h"
 #include "response.h"
 
 // A string view represents a pointer into the read buffer owned by the HTTP request handler. During
@@ -68,6 +69,7 @@ typedef struct handler_future_t {
     // Buffer state that we read into from the client fd
     read_stream_t read_stream;
     response_t* response;
+    fs_read_result_t* read_result;
 } handler_future_t;
 
 // Values that can be returned as the `value` parameter of the handler's async result.
